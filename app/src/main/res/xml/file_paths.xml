@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <external-files-path name="library" path="Music/" />
+    <files-path name="internal" path="Music/" />
+    <cache-path name="cache" path="." />
+</paths>
