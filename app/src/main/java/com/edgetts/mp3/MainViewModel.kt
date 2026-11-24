@@ -10,10 +10,18 @@ import com.edgetts.mp3.io.AudioLibrary
 import com.edgetts.mp3.io.DocumentReader
 import com.edgetts.mp3.io.LoadedDocument
 import com.edgetts.mp3.tts.Prosody
+import com.edgetts.mp3.tts.SpeechCleaner
 import com.edgetts.mp3.tts.SynthesisEngine
 import com.edgetts.mp3.tts.Voice
 import com.edgetts.mp3.tts.Voices
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -46,10 +54,14 @@ data class UiState(
     val library: List<File> = emptyList(),
     val playingPath: String? = null,
     val message: String? = null,
+    /** Strip Markdown, symbols, URLs and emoji before synthesis. */
+    val cleanForSpeech: Boolean = true,
+    /** Exactly what will be sent to the voice (cleaned or raw), refreshed in the background. */
+    val speechText: String = "",
+    val wordCount: Int = 0,
 ) {
     val sourceText: String get() = if (mode == SourceMode.File) document?.text.orEmpty() else inputText
     val canGenerate: Boolean get() = sourceText.isNotBlank() && !generating && !loadingDocument
-    val wordCount: Int get() = sourceText.split(Regex("\\s+")).count { it.isNotBlank() }
 
     /** Rough length at ~155 words per minute, scaled by the speed slider. */
     val estimatedSeconds: Long
@@ -67,10 +79,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             voice = Voices.byId(prefs.getString("voice", null)),
             ratePercent = prefs.getInt("rate", 0),
             pitchHz = prefs.getInt("pitch", 0),
+            cleanForSpeech = prefs.getBoolean("clean", true),
             library = library.list(),
         ),
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
+
+    init {
+        // Keep the "what will be read" preview and word count in sync without blocking typing.
+        @OptIn(FlowPreview::class)
+        viewModelScope.launch {
+            _state.map { it.sourceText to it.cleanForSpeech }
+                .distinctUntilChanged()
+                .debounce(250)
+                .collectLatest { (text, clean) ->
+                    val spoken = withContext(Dispatchers.Default) { speechTextFor(text, clean) }
+                    val words = spoken.split(Regex("\\s+")).count { it.isNotBlank() }
+                    _state.update { it.copy(speechText = spoken, wordCount = words) }
+                }
+        }
+    }
+
+    private fun speechTextFor(text: String, clean: Boolean) = if (clean) SpeechCleaner.clean(text) else text
 
     private var job: Job? = null
     private var player: MediaPlayer? = null
@@ -98,6 +128,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun resetTuning() { setRate(0); setPitch(0) }
+
+    fun setCleanForSpeech(enabled: Boolean) {
+        prefs.edit().putBoolean("clean", enabled).apply()
+        _state.update { it.copy(cleanForSpeech = enabled) }
+    }
 
     fun loadDocument(uri: Uri) {
         _state.update { it.copy(mode = SourceMode.File, loadingDocument = true) }
@@ -135,8 +170,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(generating = true, chunksDone = 0, chunksTotal = 0, result = null) }
         job = viewModelScope.launch {
             try {
+                val spoken = withContext(Dispatchers.Default) { speechTextFor(s.sourceText, s.cleanForSpeech) }
                 val file = engine.synthesizeToFile(
-                    text = s.sourceText,
+                    text = spoken,
                     voice = s.voice,
                     prosody = Prosody(s.ratePercent, s.pitchHz),
                     output = out,

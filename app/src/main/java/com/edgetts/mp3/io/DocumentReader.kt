@@ -60,6 +60,7 @@ class DocumentReader(private val context: Context) {
         /** Re-flows PDF line breaks into sentences so the voice does not pause at every line end. */
         fun cleanPdfText(raw: String): String = raw
             .replace("\r\n", "\n")
+            .replace(Regex("(?im)^[ \\t]*(page[ \\t]+)?\\d{1,4}([ \\t]*(of|/)[ \\t]*\\d{1,4})?[ \\t]*\\n"), "") // page numbers
             .replace(Regex("(\\p{L})-\\n(\\p{Ll})"), "$1$2")          // de-hyphenate "exam-\nple"
             .replace(Regex("[ \\t]*\\n[ \\t]*\\n\\s*"), "\u0000")     // protect paragraph breaks
             .replace(Regex("(?<=[.!?:\"\u201D])\\n"), "\u0000")       // a line ending a sentence ends a paragraph

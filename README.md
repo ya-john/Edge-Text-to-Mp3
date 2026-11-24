@@ -7,6 +7,7 @@ Android app that turns text, Markdown and PDF files into MP3s using Microsoft Ed
 ## Features
 
 - **Input:** type or paste text, or import `.txt`, `.md` or `.pdf`. You can also share text or files into the app from other apps.
+- **Clean up for listening** (on by default): strips Markdown, backslashes, underscores, emoji, decorative symbols, runs like `!!!!` or `=====`, code blocks, HTML, citation markers like `[12]` and page numbers. URLs are read as just the site name ("example.org"). It also adds full stops after headings, list items, titles and paragraph ends so the voice pauses where a person would. "Show what will be read" displays the exact text before you generate.
 - **47 English voices** in a dropdown. You can filter by gender, and each voice shows its gender, country, tone and best use. **Preview** plays a short sample with your current settings.
 - **Speed** slider from 0.5x to 2.0x and **pitch** slider from -50 Hz to +50 Hz. Both settings are remembered between sessions.
 - **Long documents** are split into chunks and synthesized four at a time, with automatic retries. The parts are then stitched back into a single MP3 with ID3 title and artist tags.
@@ -30,6 +31,7 @@ To build locally (JDK 17 and the Android SDK are required):
 | Step | File |
 | --- | --- |
 | Extract text: PDFBox for PDF, commonmark for Markdown (strips links, code blocks and HTML), with PDF line-break reflow | `io/DocumentReader.kt`, `io/MarkdownToSpeech.kt` |
+| Clean text for speech (runs on every source when the toggle is on) | `tts/SpeechCleaner.kt` |
 | Chunk on paragraph, then sentence, then clause, then word boundaries, measured in XML-escaped bytes (2 KB per chunk) | `tts/TextChunker.kt` |
 | Open a websocket to `speech.platform.bing.com`, send SSML with prosody, collect the MP3 frames | `tts/EdgeTtsClient.kt` |
 | Generate the `Sec-MS-GEC` v2 token the service requires | `tts/SecMsGec.kt` |
@@ -46,6 +48,6 @@ Edge returns headerless constant-bitrate MP3 (24 kHz, 48 kbps, mono), so joining
 ## Tests
 
 ```bash
-./gradlew testDebugUnitTest                     # token vectors, chunker, Markdown/PDF cleanup
+./gradlew testDebugUnitTest                     # token vectors, chunker, speech cleanup, Markdown/PDF cleanup
 EDGE_TTS_LIVE=1 ./gradlew testDebugUnitTest     # also hits the live service: all 47 voices + a multi-chunk stitch
 ```

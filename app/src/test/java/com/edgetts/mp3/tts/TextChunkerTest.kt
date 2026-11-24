@@ -67,7 +67,7 @@ class TextChunkerTest {
 
     @Test
     fun pdfLineBreaksAreReflowed() {
-        val raw = "This is a sen-\ntence that wraps\nacross lines.\nNew paragraph here\nstill going.\n\n• bullet one\n• bullet two"
+        val raw = "12\nThis is a sen-\ntence that wraps\nacross lines.\nPage 2 of 9\nNew paragraph here\nstill going.\n\n• bullet one\n• bullet two"
         val out = DocumentReader.cleanPdfText(raw)
         assertTrue(out, out.startsWith("This is a sentence that wraps across lines.\n\nNew paragraph here still going."))
         assertTrue(out, out.contains("\n\n• bullet one\n\n• bullet two"))

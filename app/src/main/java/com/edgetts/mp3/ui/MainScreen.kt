@@ -41,6 +41,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.CleaningServices
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Description
@@ -72,6 +73,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -159,6 +162,7 @@ fun MainScreen(vm: MainViewModel) {
                         openDoc.launch(arrayOf("text/*", "application/pdf", "application/octet-stream"))
                     },
                     onClearDoc = vm::clearDocument,
+                    onClean = vm::setCleanForSpeech,
                 )
                 VoiceCard(state, vm::setVoice, vm::previewVoice)
                 TuningCard(state, vm::setRate, vm::setPitch, vm::resetTuning)
@@ -303,6 +307,7 @@ private fun SourceCard(
     onText: (String) -> Unit,
     onPick: () -> Unit,
     onClearDoc: () -> Unit,
+    onClean: (Boolean) -> Unit,
 ) {
     GlassCard("Source", Icons.Rounded.Description) {
         SegmentedToggle(
@@ -330,6 +335,71 @@ private fun SourceCard(
                 Pill("%,d words".format(state.wordCount))
                 Pill("~${formatDuration(state.estimatedSeconds)} audio")
             }
+            Spacer(Modifier.height(14.dp))
+            CleanupPanel(state, onClean)
+        }
+    }
+}
+
+@Composable
+private fun CleanupPanel(state: UiState, onClean: (Boolean) -> Unit) {
+    var showPreview by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Palette.Bg.copy(alpha = 0.45f)).padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.CleaningServices, null, tint = Palette.Cyan, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Clean up for listening", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Removes Markdown, symbols, emoji, code and URLs, and adds natural pauses",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.Muted,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Switch(
+                checked = state.cleanForSpeech,
+                onCheckedChange = onClean,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Palette.Violet,
+                    checkedBorderColor = Color.Transparent,
+                    uncheckedThumbColor = Palette.Muted,
+                    uncheckedTrackColor = Palette.SurfaceHigher,
+                    uncheckedBorderColor = Palette.Stroke,
+                ),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(
+            Modifier.clip(RoundedCornerShape(50)).clickable { showPreview = !showPreview }.padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val rot by animateFloatAsState(if (showPreview) 180f else 0f, label = "preview-chev")
+            Text(
+                if (showPreview) "Hide what will be read" else "Show what will be read",
+                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                color = Palette.Cyan,
+            )
+            Icon(Icons.Rounded.KeyboardArrowDown, null, tint = Palette.Cyan, modifier = Modifier.size(18.dp).rotate(rot))
+        }
+        AnimatedVisibility(showPreview, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+            val preview = state.speechText
+            Text(
+                if (preview.isBlank()) "Nothing readable yet." else preview.take(2000) + if (preview.length > 2000) "\n\n..." else "",
+                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
+                color = Palette.Text.copy(alpha = 0.85f),
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .fillMaxWidth()
+                    .heightIn(max = 280.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Palette.Bg)
+                    .verticalScroll(rememberScrollState())
+                    .padding(12.dp),
+            )
         }
     }
 }
